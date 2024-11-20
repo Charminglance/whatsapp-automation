@@ -1,0 +1,3 @@
+selenium
+apscheduler
+webdriver-manager
