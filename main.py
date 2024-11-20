@@ -1,11 +1,11 @@
 import time
 import json
+import qrcode
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-import qrcode_terminal
 
 # Initialize WebDriver
 def initialize_driver():
@@ -27,8 +27,18 @@ def on_qr(driver):
     qr_code_image = driver.find_element(By.XPATH, '//div[@data-testid="qrcode"]')
     qr_code_url = qr_code_image.screenshot_as_base64
 
-    # Display the QR code in the terminal
-    qrcode_terminal.draw(qr_code_url)
+    # Generate QR code using the qrcode library and print to terminal
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(qr_code_url)
+    qr.make(fit=True)
+
+    # Print QR code in terminal
+    qr.print_ascii()
 
 # Function to send a message
 def send_message(driver, to_number, message):
