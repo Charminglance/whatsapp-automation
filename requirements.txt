@@ -1,3 +1,5 @@
 selenium
 apscheduler
 webdriver-manager
+whatsapp-web.js
+qrcode-terminal

@@ -1,60 +1,68 @@
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.firefox.options import Options
-from apscheduler.schedulers.blocking import BlockingScheduler
-from datetime import datetime
 import time
-from webdriver_manager.firefox import GeckoDriverManager
+import json
+from qrcode import QRCode
+from whatsapp_web import WhatsApp
 
-# WhatsApp Web Automation
-def send_message():
+# Initialize the WhatsApp client instance
+whatsapp = WhatsApp()
+
+# Function to handle the QR code generation and display
+def on_qr(qr_code):
+    # Generate and print the QR code for scanning
+    print("Scan the QR code below with WhatsApp Web:")
+    qr = QRCode()
+    qr.add_data(qr_code)
+    qr.print_ascii()  # Print QR in ASCII format for terminal scanning
+
+# Function to handle successful authentication
+def on_authenticated():
+    print("WhatsApp Web authenticated successfully!")
+
+# Function to send a message once authenticated
+def send_message(to_number, message):
+    # Send message after successful authentication
+    whatsapp.send_message(to_number, message)
+    print(f"Message sent to {to_number}: {message}")
+
+# Function to save session to file (for persistence)
+def save_session(session_data):
+    with open("session.json", "w") as session_file:
+        json.dump(session_data, session_file)
+    print("Session saved to session.json.")
+
+# Function to load the session from file (if exists)
+def load_session():
     try:
-        # Countdown Logic
-        trip_date = datetime(2025, 5, 1)  # Set your trip date
-        today = datetime.today()
-        remaining_days = (trip_date - today).days
-        remaining_months = remaining_days // 30
+        with open("session.json", "r") as session_file:
+            session_data = json.load(session_file)
+            return session_data
+    except FileNotFoundError:
+        return None
 
-        # Message Content
-        message = f"""🗿 **ഡെയിലി REMAINDER ഇടും ഇനി** 🗿\n\n🌍 Ladakh Trip Countdown ⏳\nMonths Left: **{remaining_months}**\nDays Left: **{remaining_days}**\n\n**പൈസ റെഡി ആക്കി വെച്ചോ മൈരന്മാരെ** 💸."""
+# Set up the event listener for QR code generation
+whatsapp.on('qr', on_qr)
 
-        # Setup Firefox options and path
-        firefox_options = Options()
-        firefox_options.add_argument("--headless")  # Run in headless mode (no GUI)
+# Set up the event listener for authentication
+whatsapp.on('authenticated', on_authenticated)
 
-        # Using webdriver-manager to get the correct geckodriver
-        firefox_service = GeckoDriverManager().install()
+# Load session if available
+session_data = load_session()
+if session_data:
+    print("Loading saved session...")
+    whatsapp.load_session(session_data)
 
-        # Initialize the WebDriver with the Firefox service
-        driver = webdriver.Firefox(executable_path=firefox_service, options=firefox_options)
+# Start the WhatsApp client (this will either authenticate or use the saved session)
+whatsapp.start()
 
-        # Open WhatsApp Web
-        driver.get("https://web.whatsapp.com")
-        print("Please scan the QR code to log in to WhatsApp Web.")
-        time.sleep(15)  # Wait for the user to scan QR code
+# Wait for the user to scan the QR code and authenticate (if session is not loaded)
+while not whatsapp.is_authenticated:
+    print("Waiting for authentication...")
+    time.sleep(5)
 
-        # Search for the Group
-        group_name = "LEH 🗿"  # Your WhatsApp group's name
-        search_box = driver.find_element(By.XPATH, '//div[@contenteditable="true"][@data-tab="3"]')
-        search_box.click()
-        search_box.send_keys(group_name + Keys.ENTER)
+# If authenticated, send a test message
+to_number = "whatsapp:+[Your Phone Number with Country Code]"  # Replace with your number
+message = "Hello from the automated WhatsApp bot!"
+send_message(to_number, message)
 
-        # Send the Message
-        time.sleep(5)  # Wait for the group chat to load
-        message_box = driver.find_element(By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]')
-        message_box.send_keys(message + Keys.ENTER)
-
-        print(f"Message sent successfully to {group_name}!")
-        driver.quit()
-    except Exception as e:
-        print(f"An error occurred: {e}")
-
-# Scheduler to Run Daily
-scheduler = BlockingScheduler()
-scheduler.add_job(send_message, 'cron', hour=9, minute=0)  # Schedule for 9:00 AM daily
-
-if __name__ == "__main__":
-    print("Starting WhatsApp message automation...")
-    send_message()  # Run once immediately for testing
-    scheduler.start()
+# Save the session data for future use
+save_session(whatsapp.session)
