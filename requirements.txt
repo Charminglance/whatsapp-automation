@@ -1,5 +1,4 @@
-selenium
-apscheduler
-webdriver-manager
-whatsapp-web.js
-qrcode-terminal
+selenium==4.8.0
+apscheduler==3.9.1
+webdriver-manager==3.8.5
+qrcode-terminal==0.12.0

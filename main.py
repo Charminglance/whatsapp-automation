@@ -1,36 +1,57 @@
 import time
 import json
-from qrcode import QRCode
-from whatsapp_web import WhatsApp
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+import qrcode_terminal
 
-# Initialize the WhatsApp client instance
-whatsapp = WhatsApp()
+# Initialize WebDriver
+def initialize_driver():
+    # Setup for Selenium WebDriver
+    options = webdriver.ChromeOptions()
+    options.add_argument("--user-data-dir=./User_Data")  # Persist session
+    options.add_argument("--profile-directory=Default")  # Use default profile
 
-# Function to handle the QR code generation and display
-def on_qr(qr_code):
-    # Generate and print the QR code for scanning
+    # Launch browser with WebDriver Manager
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    driver.get("https://web.whatsapp.com/")
+    return driver
+
+# Function to handle QR code generation and display
+def on_qr(driver):
+    # Generate the QR code for scanning
     print("Scan the QR code below with WhatsApp Web:")
-    qr = QRCode()
-    qr.add_data(qr_code)
-    qr.print_ascii()  # Print QR in ASCII format for terminal scanning
+    time.sleep(2)  # Allow time for QR code to be displayed
+    qr_code_image = driver.find_element(By.XPATH, '//div[@data-testid="qrcode"]')
+    qr_code_url = qr_code_image.screenshot_as_base64
 
-# Function to handle successful authentication
-def on_authenticated():
-    print("WhatsApp Web authenticated successfully!")
+    # Display the QR code in the terminal
+    qrcode_terminal.draw(qr_code_url)
 
-# Function to send a message once authenticated
-def send_message(to_number, message):
-    # Send message after successful authentication
-    whatsapp.send_message(to_number, message)
+# Function to send a message
+def send_message(driver, to_number, message):
+    # Find the chat input and send the message
+    search_box = driver.find_element(By.XPATH, "//div[@contenteditable='true']")
+    search_box.click()
+    search_box.send_keys(to_number + Keys.ENTER)
+    
+    time.sleep(2)  # Wait for chat to open
+
+    message_box = driver.find_element(By.XPATH, "//div[@contenteditable='true']")
+    message_box.send_keys(message)
+    message_box.send_keys(Keys.RETURN)
     print(f"Message sent to {to_number}: {message}")
 
 # Function to save session to file (for persistence)
-def save_session(session_data):
+def save_session(driver):
+    session_data = driver.get_cookie("sid")
     with open("session.json", "w") as session_file:
         json.dump(session_data, session_file)
     print("Session saved to session.json.")
 
-# Function to load the session from file (if exists)
+# Function to load session from file (if available)
 def load_session():
     try:
         with open("session.json", "r") as session_file:
@@ -39,30 +60,33 @@ def load_session():
     except FileNotFoundError:
         return None
 
-# Set up the event listener for QR code generation
-whatsapp.on('qr', on_qr)
+# Start the WebDriver and wait for QR scan
+driver = initialize_driver()
 
-# Set up the event listener for authentication
-whatsapp.on('authenticated', on_authenticated)
-
-# Load session if available
+# Load saved session if available
 session_data = load_session()
 if session_data:
     print("Loading saved session...")
-    whatsapp.load_session(session_data)
+    driver.add_cookie(session_data)
 
-# Start the WhatsApp client (this will either authenticate or use the saved session)
-whatsapp.start()
+# Display QR code for scanning
+on_qr(driver)
 
-# Wait for the user to scan the QR code and authenticate (if session is not loaded)
-while not whatsapp.is_authenticated:
-    print("Waiting for authentication...")
-    time.sleep(5)
+# Wait for user authentication (QR code scan)
+while True:
+    if driver.current_url == "https://web.whatsapp.com/":
+        print("Waiting for authentication...")
+        time.sleep(5)
+    else:
+        break
 
-# If authenticated, send a test message
-to_number = "whatsapp:+[Your Phone Number with Country Code]"  # Replace with your number
+# Once authenticated, send the message
+to_number = "[Your Phone Number with Country Code]"  # Example: +1234567890
 message = "Hello from the automated WhatsApp bot!"
-send_message(to_number, message)
+send_message(driver, to_number, message)
 
-# Save the session data for future use
-save_session(whatsapp.session)
+# Save session after authentication
+save_session(driver)
+
+# Close the browser after sending the message
+driver.quit()
